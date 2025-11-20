@@ -1,0 +1,5 @@
+{
+  "name": "Spelling Bee Ultimate",
+  "description": "A modern, React-based spelling training application with text-to-speech integration, SRS logic, and progress tracking.",
+  "requestFramePermissions": []
+}
