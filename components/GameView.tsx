@@ -284,6 +284,20 @@ export const GameView: React.FC<GameViewProps> = ({
 
   const completed = Math.max(0, totalWords - remaining);
 
+  // Accuracy Calculation
+  const totalAttempts = gameState.history.length;
+  const correctAttempts = gameState.history.filter(h => h.correct).length;
+  const accuracy = totalAttempts > 0 ? Math.round((correctAttempts / totalAttempts) * 100) : 0;
+
+  let accuracyColor = 'text-slate-400 dark:text-slate-500'; // Default 0% (Gray)
+
+  if (totalAttempts > 0) {
+    if (accuracy < 60) accuracyColor = 'text-red-500';
+    else if (accuracy < 80) accuracyColor = 'text-orange-500';
+    else if (accuracy < 90) accuracyColor = 'text-yellow-500';
+    else accuracyColor = 'text-green-500 drop-shadow-[0_0_5px_rgba(34,197,94,0.8)]';
+  }
+
   return (
     <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 relative overflow-hidden transition-colors duration-300">
       {/* Header */}
@@ -293,6 +307,12 @@ export const GameView: React.FC<GameViewProps> = ({
         <div className={`flex items-center gap-2 bg-slate-100 dark:bg-slate-700/50 px-3 py-1 rounded-full ${streak > 0 ? 'text-amber-500 dark:text-amber-400' : ''}`}>
           <i className="fas fa-fire"></i> <span>{streak}</span>
         </div>
+
+        {/* Accuracy Display */}
+        <div className={`flex items-center gap-2 bg-slate-100 dark:bg-slate-700/50 px-3 py-1 rounded-full transition-all duration-300 ${accuracyColor}`}>
+          <i className="fas fa-bullseye"></i> <span>{accuracy}%</span>
+        </div>
+
         <div className={`flex items-center gap-2 bg-slate-100 dark:bg-slate-700/50 px-3 py-1 rounded-full transition-opacity duration-300 ${config.timerEnabled ? 'opacity-100' : 'opacity-0'}`}>
           <i className="fas fa-clock"></i> <span>{timeLeft}s</span>
         </div>

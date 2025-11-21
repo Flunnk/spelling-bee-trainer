@@ -16,6 +16,14 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const correctCount = history.filter(h => h.correct).length;
   const accuracy = history.length > 0 ? Math.round((correctCount / history.length) * 100) : 0;
 
+  let accuracyColor = 'text-slate-400 dark:text-slate-500';
+  if (history.length > 0) {
+    if (accuracy < 60) accuracyColor = 'text-red-500 dark:text-red-400';
+    else if (accuracy < 80) accuracyColor = 'text-orange-500 dark:text-orange-400';
+    else if (accuracy < 90) accuracyColor = 'text-yellow-500 dark:text-yellow-400';
+    else accuracyColor = 'text-green-500 dark:text-green-400';
+  }
+
   useEffect(() => {
     if (accuracy > 80 && window.confetti) {
       window.confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
@@ -28,7 +36,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
 
       <div className="flex justify-center gap-8 mb-8">
         <div className="bg-slate-100 dark:bg-slate-900/50 p-4 rounded-2xl w-32">
-          <div className="text-3xl font-bold text-green-500 dark:text-green-400">{accuracy}%</div>
+          <div className={`text-3xl font-bold ${accuracyColor}`}>{accuracy}%</div>
           <div className="text-xs font-bold text-slate-500 uppercase mt-1">Accuracy</div>
         </div>
         <div className="bg-slate-100 dark:bg-slate-900/50 p-4 rounded-2xl w-32">
