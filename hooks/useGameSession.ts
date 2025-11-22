@@ -3,6 +3,7 @@ import { AppConfig, GameState, StoredSession } from '../types';
 
 const DEFAULT_CONFIG: AppConfig = {
     timerEnabled: false,
+    timerDuration: 30,
     loopEnabled: false,
     elevenLabsKey: '',
     voiceId: '21m00Tcm4TlvDq8ikWAM', // Rachel
@@ -18,6 +19,7 @@ const DEFAULT_GAME_STATE: GameState = {
     streak: 0,
     maxStreak: 0,
     customDefs: {},
+    isLuckySession: false,
 };
 
 export function useGameSession() {
@@ -75,6 +77,7 @@ export function useGameSession() {
     useEffect(() => {
         if (!hydrated) return;
         if (gameState.view === 'setup' && gameState.allWords.length === 0) return;
+        if (gameState.isLuckySession) return; // Don't save lucky sessions to protect previous state
 
         const stateToSave = {
             allWords: gameState.allWords,
@@ -92,20 +95,22 @@ export function useGameSession() {
         localStorage.setItem('custom_defs', JSON.stringify(newDefs));
     };
 
-    const startSession = (words: string[]) => {
+    const startSession = (words: string[], skipHistory: boolean = false) => {
         // 1. Update Recent Sessions (Max 3, Unique by content)
-        setRecentSessions(prev => {
-            const newEntry: StoredSession = {
-                id: Date.now().toString(),
-                date: Date.now(),
-                words: words,
-                label: `${words.length} words`
-            };
+        if (!skipHistory) {
+            setRecentSessions(prev => {
+                const newEntry: StoredSession = {
+                    id: Date.now().toString(),
+                    date: Date.now(),
+                    words: words,
+                    label: `${words.length} words`
+                };
 
-            // Filter out identical lists to avoid duplicates
-            const filtered = prev.filter(s => JSON.stringify(s.words) !== JSON.stringify(words));
-            return [newEntry, ...filtered].slice(0, 3);
-        });
+                // Filter out identical lists to avoid duplicates
+                const filtered = prev.filter(s => JSON.stringify(s.words) !== JSON.stringify(words));
+                return [newEntry, ...filtered].slice(0, 3);
+            });
+        }
 
         // 2. Reset Game State
         setGameState(prev => ({
@@ -117,6 +122,7 @@ export function useGameSession() {
             streak: 0,
             maxStreak: 0,
             currentWord: '',
+            isLuckySession: skipHistory, // Mark as lucky if skipping history
         }));
     };
 
@@ -136,13 +142,52 @@ export function useGameSession() {
             if (!h.correct) mistakes.add(h.word);
         });
 
-        setLastMistakes(Array.from(mistakes));
+        if (!gameState.isLuckySession) {
+            setLastMistakes(Array.from(mistakes));
+        }
         setGameState(prev => ({ ...prev, view: 'summary' }));
     };
 
     const resetGame = () => {
-        setGameState(prev => ({ ...prev, view: 'setup', allWords: [], bag: [], history: [] }));
+        setGameState(prev => ({
+            ...prev,
+            view: 'setup',
+            allWords: [],
+            bag: [],
+            history: [],
+            currentWord: '',
+            streak: 0,
+            maxStreak: 0,
+            isLuckySession: false
+        }));
         localStorage.removeItem('sb_state');
+    };
+
+    const restoreSavedSession = () => {
+        const savedState = localStorage.getItem('sb_state');
+        if (savedState) {
+            const parsedState = JSON.parse(savedState);
+            setGameState(prev => ({
+                ...prev,
+                ...parsedState,
+                view: 'setup',
+                currentWord: '', // IMPORTANT: Clear any leftover word from the lucky session
+                isLuckySession: false, // Ensure we are back to normal
+            }));
+        } else {
+            // No saved state, just reset to empty setup
+            setGameState(prev => ({
+                ...prev,
+                view: 'setup',
+                allWords: [],
+                bag: [],
+                history: [],
+                currentWord: '',
+                streak: 0,
+                maxStreak: 0,
+                isLuckySession: false
+            }));
+        }
     };
 
     return {
@@ -159,7 +204,8 @@ export function useGameSession() {
             updateGameState,
             saveCustomDef,
             handleSessionEnd,
-            resetGame
+            resetGame,
+            restoreSavedSession
         }
     };
 }

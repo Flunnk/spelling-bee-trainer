@@ -6,6 +6,7 @@ export interface WordHistory {
 
 export interface AppConfig {
   timerEnabled: boolean;
+  timerDuration?: number;
   loopEnabled: boolean;
   elevenLabsKey: string;
   voiceId: string;
@@ -28,6 +29,7 @@ export interface GameState {
   streak: number;
   maxStreak: number;
   customDefs: Record<string, string>;
+  isLuckySession?: boolean;
 }
 
 export interface DictionaryEntry {

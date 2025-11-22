@@ -1,6 +1,8 @@
 export class AudioService {
   private static ctx: AudioContext | null = null;
   private static audioCache: Record<string, string> = {}; // Cache URLs
+  private static currentAudio: HTMLAudioElement | null = null;
+  private static currentSpeakId: number = 0;
 
   private static getContext(): AudioContext {
     if (!this.ctx) {
@@ -45,10 +47,20 @@ export class AudioService {
   }
 
   static async speak(text: string, voiceId: string, apiKey: string, rate: number = 1.0): Promise<void> {
+    const myId = ++this.currentSpeakId;
+
+    // Stop any currently playing audio
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio.currentTime = 0;
+      this.currentAudio = null;
+    }
+    window.speechSynthesis.cancel();
+
     // Browser Fallback or "Robot" mode
     const playBrowser = () => {
+      if (myId !== this.currentSpeakId) return Promise.resolve();
       return new Promise<void>((resolve) => {
-        window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         u.lang = /[áéíóúñ]/.test(text) ? 'es-ES' : 'en-US';
         u.rate = rate;
@@ -65,9 +77,15 @@ export class AudioService {
     // Check Cache
     const cacheKey = `${text}-${voiceId}-${rate}`;
     if (this.audioCache[cacheKey]) {
+      if (myId !== this.currentSpeakId) return;
       const audio = new Audio(this.audioCache[cacheKey]);
+      this.currentAudio = audio;
       audio.playbackRate = rate;
-      await audio.play();
+      try {
+        await audio.play();
+      } catch (e) {
+        console.error("Audio playback failed", e);
+      }
       return;
     }
 
@@ -87,13 +105,17 @@ export class AudioService {
       if (!res.ok) throw new Error('ElevenLabs API Error');
 
       const blob = await res.blob();
+      if (myId !== this.currentSpeakId) return;
+
       const url = URL.createObjectURL(blob);
       this.audioCache[cacheKey] = url;
 
       const audio = new Audio(url);
+      this.currentAudio = audio;
       audio.playbackRate = rate;
       await audio.play();
     } catch (e) {
+      if (myId !== this.currentSpeakId) return;
       console.warn("TTS Failed, falling back to browser", e);
       return playBrowser();
     }

@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { AppConfig, StoredSession } from '../types';
 import { AudioService } from '../services/audioService';
+import { EASY_WORDS, HARD_WORDS } from '../services/wordList';
 
 interface SetupViewProps {
   config: AppConfig;
   setConfig: (c: AppConfig) => void;
-  onStart: (words: string[]) => void;
+  onStart: (words: string[], skipHistory?: boolean) => void;
   onResume: () => void;
   hasSavedState: boolean;
   recentSessions: StoredSession[];
@@ -31,6 +32,24 @@ export const SetupView: React.FC<SetupViewProps> = ({
   config, setConfig, onStart, onResume, hasSavedState, recentSessions, lastMistakes
 }) => {
   const [rawWords, setRawWords] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleWordChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    setRawWords(newValue);
+    setIsTyping(true);
+    if (error) setError(null);
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+    }, 2500);
+  };
 
   const handleStart = () => {
     AudioService.resume();
@@ -40,11 +59,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
       .filter(w => w.length > 0);
 
     if (cleanedWords.length === 0) {
-      alert('Please enter at least one valid word.');
-      return;
-    }
-    if (cleanedWords.length === 0) {
-      alert('Please enter at least one valid word.');
+      setError('Please enter at least one valid word.');
       return;
     }
 
@@ -69,6 +84,35 @@ export const SetupView: React.FC<SetupViewProps> = ({
   const loadSession = (words: string[]) => {
     AudioService.resume();
     onStart(words);
+  };
+
+  const handleLuckyStart = () => {
+    AudioService.resume();
+
+    // Shuffle Easy Words
+    const shuffledEasy = [...EASY_WORDS];
+    for (let i = shuffledEasy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledEasy[i], shuffledEasy[j]] = [shuffledEasy[j], shuffledEasy[i]];
+    }
+
+    // Shuffle Hard Words
+    const shuffledHard = [...HARD_WORDS];
+    for (let i = shuffledHard.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledHard[i], shuffledHard[j]] = [shuffledHard[j], shuffledHard[i]];
+    }
+
+    // Select 9 Easy + 1 Hard
+    const selected = [...shuffledEasy.slice(0, 9), shuffledHard[0]];
+
+    // Shuffle the final selection so the hard word isn't always last
+    for (let i = selected.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [selected[i], selected[j]] = [selected[j], selected[i]];
+    }
+
+    onStart(selected, true);
   };
 
   return (
@@ -108,14 +152,29 @@ export const SetupView: React.FC<SetupViewProps> = ({
       )}
 
       <div className="space-y-4">
+
+        <button
+          onClick={handleLuckyStart}
+          className="w-full py-4 mb-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-500/30 transition-all active:scale-95 flex items-center justify-center gap-3 animate-glow-green transform hover:-translate-y-1"
+        >
+          <i className="fas fa-dice text-2xl"></i>
+          <span>I'm Feeling Lucky</span>
+          <span className="text-xs bg-white/20 px-2 py-1 rounded-full">10 Words</span>
+        </button>
+
         <div>
           <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Word List</label>
           <textarea
             value={rawWords}
-            onChange={(e) => setRawWords(e.target.value)}
+            onChange={handleWordChange}
             placeholder="Paste words here...&#10;Example: coffee, café, mañana, château"
-            className="w-full h-24 bg-slate-100 dark:bg-slate-700 border-2 border-transparent focus:border-indigo-500 rounded-xl p-4 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-colors resize-none"
+            className={`w-full h-24 bg-slate-100 dark:bg-slate-700 border-2 ${error ? 'border-red-500 focus:border-red-500' : 'border-transparent focus:border-indigo-500'} rounded-xl p-4 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-colors resize-none`}
           />
+          {error && (
+            <p className="mt-2 text-sm text-red-500 font-medium animate-pulse">
+              <i className="fas fa-exclamation-circle mr-1"></i> {error}
+            </p>
+          )}
         </div>
 
         {/* Recent Sessions */}
@@ -133,8 +192,6 @@ export const SetupView: React.FC<SetupViewProps> = ({
             ))}
           </div>
         )}
-
-
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -169,30 +226,61 @@ export const SetupView: React.FC<SetupViewProps> = ({
           </div>
         </div>
 
-        <div className="flex gap-4 p-4 bg-slate-100 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700/50 transition-colors">
-          <label className="flex items-center gap-3 cursor-pointer flex-1">
-            <input
-              type="checkbox"
-              checked={config.timerEnabled}
-              onChange={(e) => setConfig({ ...config, timerEnabled: e.target.checked })}
-              className="w-5 h-5 rounded bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-500 text-indigo-500 focus:ring-indigo-500 transition-colors"
-            />
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Timer (30s)</span>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer flex-1">
-            <input
-              type="checkbox"
-              checked={config.loopEnabled}
-              onChange={(e) => setConfig({ ...config, loopEnabled: e.target.checked })}
-              className="w-5 h-5 rounded bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-500 text-indigo-500 focus:ring-indigo-500 transition-colors"
-            />
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Infinite Loop</span>
-          </label>
+        <div className="grid grid-cols-1 gap-4">
+          {/* Timer Toggle & Config */}
+          <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600 transition-all hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md">
+            <div className="flex items-center gap-4 cursor-pointer" onClick={() => setConfig({ ...config, timerEnabled: !config.timerEnabled })}>
+              <div className={`w-14 h-8 flex items-center rounded-full p-1 transition-colors duration-300 ${config.timerEnabled ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                <div className={`bg-white w-6 h-6 rounded-full shadow-md transform duration-300 ${config.timerEnabled ? 'translate-x-6' : ''}`}></div>
+              </div>
+              <span className="font-bold text-slate-700 dark:text-slate-200">Timer</span>
+            </div>
+
+            {config.timerEnabled && (
+              <div className="flex items-center gap-2 animate-fade-in">
+                <button
+                  onClick={() => setConfig({ ...config, timerDuration: Math.max(5, (config.timerDuration || 30) - 5) })}
+                  className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-600 rounded-lg shadow-sm text-indigo-500 hover:bg-indigo-50 dark:hover:bg-slate-500 transition-colors font-bold active:scale-95"
+                >
+                  <i className="fas fa-minus text-xs"></i>
+                </button>
+                <div className="relative w-16">
+                  <input
+                    type="number"
+                    value={config.timerDuration || 30}
+                    onChange={(e) => setConfig({ ...config, timerDuration: parseInt(e.target.value) || 30 })}
+                    className="w-full text-center bg-transparent font-bold text-slate-800 dark:text-white outline-none"
+                  />
+                  <span className="absolute right-0 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold pointer-events-none">s</span>
+                </div>
+                <button
+                  onClick={() => setConfig({ ...config, timerDuration: Math.min(300, (config.timerDuration || 30) + 5) })}
+                  className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-600 rounded-lg shadow-sm text-indigo-500 hover:bg-indigo-50 dark:hover:bg-slate-500 transition-colors font-bold active:scale-95"
+                >
+                  <i className="fas fa-plus text-xs"></i>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Loop Toggle */}
+          <div
+            className="flex items-center justify-between bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600 transition-all hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md cursor-pointer"
+            onClick={() => setConfig({ ...config, loopEnabled: !config.loopEnabled })}
+          >
+            <div className="flex items-center gap-4">
+              <div className={`w-14 h-8 flex items-center rounded-full p-1 transition-colors duration-300 ${config.loopEnabled ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                <div className={`bg-white w-6 h-6 rounded-full shadow-md transform duration-300 ${config.loopEnabled ? 'translate-x-6' : ''}`}></div>
+              </div>
+              <span className="font-bold text-slate-700 dark:text-slate-200">Infinite Loop</span>
+            </div>
+          </div>
         </div>
 
         <button
           onClick={handleStart}
-          className="w-full mt-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-lg uppercase tracking-wider shadow-lg shadow-indigo-900/20 transition-all active:scale-95"
+          className={`w-full mt-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-lg uppercase tracking-wider shadow-lg shadow-indigo-900/20 transition-all active:scale-95 ${rawWords.trim().length > 0 && !isTyping ? 'animate-glow-indigo' : ''
+            }`}
         >
           Start Session
         </button>

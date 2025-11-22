@@ -19,12 +19,13 @@ export const GameView: React.FC<GameViewProps> = ({
   // Local UI State
   const [input, setInput] = useState('');
   const [feedback, setFeedback] = useState<FeedbackStatus>('idle');
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(config.timerDuration || 30);
   const [hintUsed, setHintUsed] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [dictData, setDictData] = useState<DictionaryEntry | null>(null);
   const [showInfo, setShowInfo] = useState<'def' | 'sent' | null>(null);
   const [turnCount, setTurnCount] = useState(0); // Force effect run on same word
+  const [warning, setWarning] = useState<string | null>(null);
 
   // Refs
   const inputRef = useRef<HTMLInputElement>(null);
@@ -64,9 +65,10 @@ export const GameView: React.FC<GameViewProps> = ({
     setInput('');
     setFeedback('idle');
     setHintUsed(false);
-    setTimeLeft(30);
+    setTimeLeft(config.timerDuration || 30);
     setShowInfo(null);
     setDictData(null);
+    setWarning(null);
     pendingBagRef.current = null; // Clear pending bag
     isTransitioningRef.current = false; // Reset transition lock
 
@@ -133,6 +135,11 @@ export const GameView: React.FC<GameViewProps> = ({
     }
 
     if (timerRef.current) clearInterval(timerRef.current);
+
+    if (!isTimeout && !input.trim()) {
+      setWarning("Please enter an answer!");
+      return;
+    }
 
     const isCorrect = !isTimeout && input.trim().toLowerCase() === currentWord.toLowerCase();
 
@@ -232,26 +239,49 @@ export const GameView: React.FC<GameViewProps> = ({
   // --- Render Helpers ---
 
   const renderDiff = () => {
-    const target = currentWord;
-    const attempt = input;
-    const maxLen = Math.max(target.length, attempt.length);
-    const chars = [];
-
-    for (let i = 0; i < maxLen; i++) {
-      const t = target[i];
-      const a = attempt[i];
-
-      if (!t) { // User typed extra
-        chars.push(<span key={i} className="text-red-500 underline decoration-2 decoration-red-500">{a}</span>);
-      } else if (!a) { // Missing
-        chars.push(<span key={i} className="text-slate-600">_</span>);
-      } else if (a.toLowerCase() === t.toLowerCase()) {
-        chars.push(<span key={i} className="text-green-500">{t}</span>);
-      } else {
-        chars.push(<span key={i} className="text-red-500 underline decoration-2 decoration-red-500">{t}</span>);
-      }
+    if (feedback === 'correct' || feedback === 'assisted') {
+      return (
+        <div className="text-4xl font-bold tracking-widest break-all text-green-500">
+          {currentWord}
+        </div>
+      );
     }
-    return <div className="text-4xl font-bold tracking-widest break-all">{chars}</div>;
+
+    // For incorrect / timeout
+    const attempt = input;
+    const target = currentWord;
+
+    const attemptChars = attempt.split('').map((char, i) => {
+      const isMatch = target[i] && char.toLowerCase() === target[i].toLowerCase();
+      return (
+        <span
+          key={i}
+          className={isMatch ? "text-slate-700 dark:text-slate-200" : "text-red-500 underline decoration-2 decoration-red-500"}
+        >
+          {char}
+        </span>
+      );
+    });
+
+    return (
+      <div className="flex flex-col items-center gap-4">
+        {/* User's Attempt */}
+        <div className="flex flex-col items-center">
+          <span className="text-xs uppercase tracking-wider text-slate-400 mb-1">You said</span>
+          <div className="text-3xl font-bold tracking-widest break-all">
+            {attempt ? attemptChars : <span className="text-slate-400 italic">Nothing</span>}
+          </div>
+        </div>
+
+        {/* Correct Answer */}
+        <div className="flex flex-col items-center">
+          <span className="text-xs uppercase tracking-wider text-slate-400 mb-1">Correct</span>
+          <div className="text-3xl font-bold tracking-widest break-all text-green-500">
+            {target}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Info Content
@@ -329,7 +359,7 @@ export const GameView: React.FC<GameViewProps> = ({
               strokeWidth="4"
               strokeLinecap="round"
               strokeDasharray="377"
-              strokeDashoffset={377 - (timeLeft / 30) * 377}
+              strokeDashoffset={377 - (timeLeft / (config.timerDuration || 30)) * 377}
               className="transition-[stroke-dashoffset] duration-1000 linear"
             />
           </svg>
@@ -372,7 +402,10 @@ export const GameView: React.FC<GameViewProps> = ({
               ref={inputRef}
               type="text"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                if (warning) setWarning(null);
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -389,6 +422,11 @@ export const GameView: React.FC<GameViewProps> = ({
             {hintUsed && (
               <div className="text-amber-500 font-bold mt-2 animate-pulse">
                 {currentWord.charAt(0) + ' _'.repeat(currentWord.length - 1)} ({currentWord.length})
+              </div>
+            )}
+            {warning && (
+              <div className="text-red-500 font-bold mt-2 animate-bounce">
+                {warning}
               </div>
             )}
           </>
@@ -423,6 +461,6 @@ export const GameView: React.FC<GameViewProps> = ({
           Save & Exit
         </button>
       </div>
-    </div>
+    </div >
   );
 };

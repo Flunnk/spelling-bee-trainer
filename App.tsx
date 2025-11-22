@@ -49,7 +49,13 @@ export default function App() {
             onUpdateState={actions.updateGameState}
             onSaveDef={actions.saveCustomDef}
             onFinish={actions.handleSessionEnd}
-            onExit={() => actions.updateGameState({ view: 'setup' })}
+            onExit={() => {
+              if (gameState.isLuckySession) {
+                actions.restoreSavedSession();
+              } else {
+                actions.updateGameState({ view: 'setup' });
+              }
+            }}
           />
         )}
 

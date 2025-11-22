@@ -15,3 +15,50 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #64748b;
 }
+
+@keyframes glowing-green {
+  0% {
+    box-shadow: 0 0 5px #22c55e;
+  }
+
+  50% {
+    box-shadow: 0 0 20px #22c55e, 0 0 10px #4ade80;
+  }
+
+  100% {
+    box-shadow: 0 0 5px #22c55e;
+  }
+}
+
+.animate-glow-green {
+  animation: glowing-green 4s infinite;
+}
+
+@keyframes glowing-indigo {
+  0% {
+    box-shadow: 0 0 5px #6366f1;
+  }
+
+  50% {
+    box-shadow: 0 0 20px #6366f1, 0 0 10px #818cf8;
+  }
+
+  100% {
+    box-shadow: 0 0 5px #6366f1;
+  }
+}
+
+.animate-glow-indigo {
+  animation: glowing-indigo 2s infinite;
+}
+
+/* Hide number input spinners */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+}
