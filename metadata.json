@@ -1,0 +1,5 @@
+{
+  "name": "Spelling Bee Ultimate",
+  "description": "A React spelling trainer with text-to-speech, within-session mistake review, and progress tracking.",
+  "requestFramePermissions": []
+}
