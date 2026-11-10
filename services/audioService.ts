@@ -143,8 +143,17 @@ export class AudioService {
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                  text,
-                  model_id: 'eleven_multilingual_v2',
+                  // Quotes + period give the model a clear word boundary, avoiding trailing artifacts.
+                  text: `"${text.trim()}."`,
+                  model_id: 'eleven_turbo_v2_5',
+                  // Force the language so single words aren't interpreted as another language.
+                  language_code: language.split('-')[0],
+                  voice_settings: {
+                    stability: 0.85,
+                    similarity_boost: 0.85,
+                    style: 0,
+                    use_speaker_boost: true,
+                  },
                 }),
               }
             );
